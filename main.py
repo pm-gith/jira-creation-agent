@@ -60,6 +60,28 @@ def create_jira_ticket(sca_num, description):
     issue = jira.create_issue(fields=issue_dict)
     return issue.key
 
+#Find Child Task
+def find_child_task(epic_key):
+    jql_query = f'"customfield_10008" = "{epic_key}" AND summary ~ "Part Status: Design"'
+    print(jql_query)
+    issues = jira.search_issues(jql_query)
+    return issues[0] if issues else None
+
+#Transition Child Task to Completed
+def complete_task(issue):
+    # Fetch available transitions
+    transitions = jira.transitions(issue)
+    
+    # Find transition ID for "Done"
+    done_transition = next((t['id'] for t in transitions if t['name'].lower() in ['done', 'completed']), None)
+    
+    if done_transition:
+        jira.transition_issue(issue, done_transition)
+        print(f"Child task {issue.key} marked as Done.")
+    else:
+        print(f"No 'Done' transition found for {issue.key}.")
+
+
 #Write Jira Key back to Excel
 for sca_num, group in groups:
     sca_title = group["SCA title"].iloc[0]
@@ -67,6 +89,15 @@ for sca_num, group in groups:
 
     #Create ticket in JIRA
     jira_key = create_jira_ticket(sca_num, description)
+
+    # Mark child Part Status: Design task as Done
+    child_task = find_child_task(jira_key)
+    print(jira_key)
+    if child_task:
+        complete_task(child_task)
+    else:
+        print(f"No child task 'Part Status: Design' found for {jira_key}")
+
 
     #Update Jira# for this SCA in main df
     jira_url = f"{JIRA_SERVER}/browse/{jira_key}"
